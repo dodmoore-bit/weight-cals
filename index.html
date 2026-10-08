@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f172a" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="description" content="Track weight and daily calories offline." />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="icons/icon-192.png" type="image/png" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <link rel="stylesheet" href="styles.css" />
+  <title>Weight &amp; Calories</title>
+</head>
+<body>
+  <header class="app-header">
+    <div>
+      <h1>Weight &amp; Calories</h1>
+      <p class="sub" id="header-date">—</p>
+    </div>
+    <span class="badge" id="offline-badge" title="Works offline">Offline-ready</span>
+  </header>
+
+  <main>
+    <!-- TODAY -->
+    <section id="panel-today" class="panel active" role="tabpanel">
+      <div class="stats">
+        <div class="stat">
+          <div class="label">Weight</div>
+          <div class="value" id="stat-weight">—</div>
+          <div class="meta" id="stat-weight-meta">lbs</div>
+        </div>
+        <div class="stat">
+          <div class="label">Amt Lost</div>
+          <div class="value good" id="stat-lost">—</div>
+          <div class="meta" id="stat-lost-meta">vs start</div>
+        </div>
+        <div class="stat">
+          <div class="label">Calories</div>
+          <div class="value" id="stat-cals">—</div>
+          <div class="meta" id="stat-cals-meta">of 2000 goal</div>
+        </div>
+        <div class="stat">
+          <div class="label">vs Goal</div>
+          <div class="value" id="stat-diff">—</div>
+          <div class="meta" id="stat-diff-meta">under / over</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Today’s weight</h2>
+        <p class="hint">Amt Lost = start weight − today’s weight</p>
+        <div class="field">
+          <label for="input-weight">Weight (lbs)</label>
+          <input id="input-weight" type="number" inputmode="decimal" step="0.1" min="50" max="600" placeholder="e.g. 180.0" />
+        </div>
+        <button type="button" class="btn btn-primary" id="btn-save-weight">Save weight</button>
+      </div>
+
+      <div class="card">
+        <h2>Today’s meals</h2>
+        <p class="hint">Enter a meal total, or use Σ Parts to add pieces (e.g. 280 + 120). Empty = not logged.</p>
+
+        <div class="meal-block" data-meal="breakfast">
+          <div class="meal-head">
+            <label for="input-bf">Breakfast</label>
+            <span class="meal-parts-hint" id="hint-bf" hidden></span>
+          </div>
+          <div class="meal-row">
+            <input id="input-bf" type="number" inputmode="numeric" step="1" min="0" max="10000" placeholder="kcal total" aria-label="Breakfast total kcal" />
+            <button type="button" class="btn btn-ghost btn-parts" data-open-parts="breakfast" aria-label="Add breakfast parts">Σ Parts</button>
+          </div>
+        </div>
+
+        <div class="meal-block" data-meal="lunch">
+          <div class="meal-head">
+            <label for="input-lunch">Lunch</label>
+            <span class="meal-parts-hint" id="hint-lunch" hidden></span>
+          </div>
+          <div class="meal-row">
+            <input id="input-lunch" type="number" inputmode="numeric" step="1" min="0" max="10000" placeholder="kcal total" aria-label="Lunch total kcal" />
+            <button type="button" class="btn btn-ghost btn-parts" data-open-parts="lunch" aria-label="Add lunch parts">Σ Parts</button>
+          </div>
+        </div>
+
+        <div class="meal-block" data-meal="dinner">
+          <div class="meal-head">
+            <label for="input-dinner">Dinner</label>
+            <span class="meal-parts-hint" id="hint-dinner" hidden></span>
+          </div>
+          <div class="meal-row">
+            <input id="input-dinner" type="number" inputmode="numeric" step="1" min="0" max="10000" placeholder="kcal total" aria-label="Dinner total kcal" />
+            <button type="button" class="btn btn-ghost btn-parts" data-open-parts="dinner" aria-label="Add dinner parts">Σ Parts</button>
+          </div>
+        </div>
+
+        <div class="progress" id="cal-progress" aria-hidden="true"><span style="width:0%"></span></div>
+        <p class="hint" id="cal-progress-label" style="margin-top:0">0 / 2000 kcal</p>
+        <button type="button" class="btn btn-primary" id="btn-save-cals">Save calories</button>
+      </div>
+    </section>
+
+    <!-- WEIGHT HISTORY -->
+    <section id="panel-weight" class="panel" role="tabpanel">
+      <div class="card">
+        <h2>Weight trend</h2>
+        <div class="chart-legend">
+          <span class="leg-weight">Weight (lbs)</span>
+          <span class="leg-trend">Trend</span>
+        </div>
+        <div class="chart-wrap weight-chart-lg" id="weight-chart"></div>
+      </div>
+      <div class="card">
+        <details class="history-dropdown" id="weight-history-details">
+          <summary class="history-summary">
+            <span class="history-summary-title">Weight history</span>
+            <span class="history-summary-meta" id="weight-history-count"></span>
+          </summary>
+          <ul class="list" id="weight-list"></ul>
+        </details>
+      </div>
+    </section>
+
+    <!-- CALORIE HISTORY -->
+    <section id="panel-cals" class="panel" role="tabpanel">
+      <div class="card">
+        <h2>Calorie trend</h2>
+        <div class="chart-legend">
+          <span class="leg-cals">Total kcal</span>
+          <span class="leg-goal">Daily goal</span>
+        </div>
+        <div class="chart-wrap weight-chart-lg" id="cals-chart"></div>
+      </div>
+      <div class="card">
+        <details class="history-dropdown" id="cals-history-details">
+          <summary class="history-summary">
+            <span class="history-summary-title">Calorie history</span>
+            <span class="history-summary-meta" id="cals-history-count"></span>
+          </summary>
+          <ul class="list" id="cals-list"></ul>
+        </details>
+      </div>
+    </section>
+
+    <!-- SETTINGS / DATA -->
+    <section id="panel-data" class="panel" role="tabpanel">
+      <div class="card">
+        <h2>Goals &amp; reference</h2>
+        <div class="settings-grid">
+          <div class="field">
+            <label for="cfg-start-weight">Starting reference weight (lbs)</label>
+            <input id="cfg-start-weight" type="number" inputmode="decimal" step="0.1" />
+          </div>
+          <div class="field">
+            <label for="cfg-goal-cals">Goal daily calories</label>
+            <input id="cfg-goal-cals" type="number" inputmode="numeric" step="1" />
+          </div>
+          <div class="field">
+            <label for="cfg-tdee">Est. TDEE (optional, display only)</label>
+            <input id="cfg-tdee" type="number" inputmode="numeric" step="1" />
+          </div>
+          <button type="button" class="btn btn-primary" id="btn-save-cfg">Save settings</button>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Import history</h2>
+        <p class="hint">Load a history file (.json) from your phone, or paste its text below. Imported values replace what’s on this device for the same dates.</p>
+        <div class="actions">
+          <button type="button" class="btn btn-primary" id="btn-import">Choose history file</button>
+          <input type="file" id="import-file" class="hidden-file" accept=".json,.csv,.txt,application/json,text/csv,text/plain" />
+        </div>
+        <div class="field" style="margin-top:12px">
+          <label for="import-text">Or paste history JSON</label>
+          <textarea id="import-text" class="import-text" rows="5" spellcheck="false" autocapitalize="off" autocomplete="off" placeholder='{"weights":{...},"calories":{...}}'></textarea>
+        </div>
+        <button type="button" class="btn btn-ghost" id="btn-import-paste">Import pasted JSON</button>
+        <p class="hint import-status" id="import-status" hidden></p>
+      </div>
+      <div class="card">
+        <h2>Export / backup</h2>
+        <p class="hint">Data stays on this device (localStorage). Export a backup regularly.</p>
+        <div class="actions">
+          <button type="button" class="btn btn-ghost" id="btn-export-json">Export JSON</button>
+          <button type="button" class="btn btn-ghost" id="btn-export-csv">Export CSV</button>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Danger zone</h2>
+        <button type="button" class="btn btn-danger" id="btn-clear">Clear all local data</button>
+      </div>
+    </section>
+  </main>
+
+  <nav class="nav" role="tablist" aria-label="Main">
+    <button type="button" class="active" data-panel="today" aria-selected="true">
+      <span class="ico" aria-hidden="true">📅</span>Today
+    </button>
+    <button type="button" data-panel="weight" aria-selected="false">
+      <span class="ico" aria-hidden="true">⚖️</span>Weight
+    </button>
+    <button type="button" data-panel="cals" aria-selected="false">
+      <span class="ico" aria-hidden="true">🔥</span>Cals
+    </button>
+    <button type="button" data-panel="data" aria-selected="false">
+      <span class="ico" aria-hidden="true">⚙️</span>Data
+    </button>
+  </nav>
+
+  <!-- Meal parts adder sheet -->
+  <div class="sheet-backdrop" id="parts-backdrop" hidden></div>
+  <div class="sheet" id="parts-sheet" role="dialog" aria-modal="true" aria-labelledby="parts-sheet-title" hidden>
+    <div class="sheet-handle" aria-hidden="true"></div>
+    <div class="sheet-header">
+      <h2 id="parts-sheet-title">Meal parts</h2>
+      <button type="button" class="btn btn-ghost btn-sm sheet-close" id="parts-cancel" aria-label="Close">✕</button>
+    </div>
+    <p class="hint" id="parts-sheet-hint">Add each piece’s kcal. Sum fills the meal total.</p>
+    <div class="parts-list" id="parts-list"></div>
+    <button type="button" class="btn btn-ghost" id="parts-add">+ Add part</button>
+    <div class="parts-sum-bar">
+      <span class="parts-sum-label">Running sum</span>
+      <span class="parts-sum-value" id="parts-sum">0</span>
+      <span class="parts-sum-unit">kcal</span>
+    </div>
+    <div class="sheet-actions">
+      <button type="button" class="btn btn-ghost" id="parts-clear">Clear parts</button>
+      <button type="button" class="btn btn-primary" id="parts-apply">Apply sum</button>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="app.js"></script>
+</body>
+</html>

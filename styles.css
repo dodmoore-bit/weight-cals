@@ -807,3 +807,9 @@ main {
   font-weight: 600;
 }
 .card .hint.list-tap-hint { margin: 2px 0 4px; }
+
+/* Calorie trend: pixel-true chart that fits the card (no sideways scroll), bigger legend. */
+#cals-chart.chart-wrap { overflow-x: hidden; width: 100%; max-width: 100%; }
+#cals-chart.chart-wrap svg { min-width: 0; max-width: 100%; }
+#panel-cals .chart-legend { font-size: 1.2rem; gap: 18px; margin-bottom: 8px; }
+#panel-cals .chart-legend span::before { width: 16px; height: 16px; vertical-align: -2px; }

@@ -1,5 +1,5 @@
 /* Weight & Calories PWA service worker — cache-first for app shell */
-const CACHE = 'wc-track-pages-v2';
+const CACHE = 'wc-track-pages-v3';
 const ASSETS = [
   './',
   './index.html',

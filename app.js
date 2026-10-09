@@ -539,6 +539,82 @@
     return Object.keys(obj).sort();
   }
 
+  // Pixel-true chart: viewBox = on-screen CSS px, so font sizes are real px on the phone.
+  // Fits the card width (no sideways scroll), uses round Y ticks, and thins X labels so they never overlap.
+  function niceStep(range, maxTicks) {
+    const raw = range / Math.max(1, maxTicks);
+    const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+    for (const m of [1, 2, 2.5, 5, 10]) if (m * mag >= raw) return m * mag;
+    return 10 * mag;
+  }
+
+  function drawPixelChart(container, points, opts) {
+    container.innerHTML = '';
+    if (!points.length) {
+      container.innerHTML = '<p class="hint" style="text-align:center;padding:20px">No data yet</p>';
+      return;
+    }
+    const fontSize = opts.fontSize || 20;          // Y-axis labels (px)
+    const xFontSize = opts.xFontSize || fontSize;  // X-axis labels (px)
+    const labelOpacity = opts.labelOpacity != null ? opts.labelOpacity : 0.8;
+    const gridOpacity = opts.gridOpacity != null ? opts.gridOpacity : 0.2;
+    let W = Math.floor(container.clientWidth);
+    if (!W) W = Math.max(280, Math.floor(document.documentElement.clientWidth) - 62);
+    const H = opts.height || 340;
+
+    const ys = points.map(p => p.y);
+    if (opts.goalY != null) ys.push(opts.goalY);
+    let ymin = Math.min(...ys), ymax = Math.max(...ys);
+    if (ymin === ymax) { ymin -= 100; ymax += 100; }
+    const step = niceStep(ymax - ymin, opts.maxYTicks || 4);
+    ymin = Math.floor(ymin / step) * step;
+    ymax = Math.ceil(ymax / step) * step;
+    if (ymin < 0) ymin = 0;
+    const ticks = [];
+    for (let v = ymin; v <= ymax + step / 2; v += step) ticks.push(v);
+
+    const charW = 0.62; // approx glyph width / font size for digits
+    const yLabelW = Math.max(...ticks.map(v => String(Math.round(v)).length)) * charW * fontSize;
+    const xLabelW = Math.max(...points.map(p => String(p.xLabel).length)) * charW * xFontSize;
+    const pad = {
+      t: Math.ceil(fontSize * 0.7),
+      r: Math.ceil(xLabelW / 2) + 4,
+      b: Math.ceil(xFontSize * 2.4),
+      l: Math.ceil(yLabelW) + 10
+    };
+    const iw = W - pad.l - pad.r;
+    const ih = H - pad.t - pad.b;
+    const n = points.length;
+    const xAt = (i) => pad.l + (n === 1 ? iw / 2 : (i / (n - 1)) * iw);
+    const yAt = (v) => pad.t + ((ymax - v) / (ymax - ymin)) * ih;
+
+    let svg = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${opts.label || 'chart'}" style="width:${W}px;height:${H}px;min-width:0">`;
+    ticks.forEach(v => {
+      const gy = yAt(v);
+      svg += `<line x1="${pad.l}" y1="${gy.toFixed(1)}" x2="${W - pad.r}" y2="${gy.toFixed(1)}" stroke="currentColor" stroke-opacity="${gridOpacity}" stroke-width="1" />`;
+      svg += `<text x="${pad.l - 8}" y="${(gy + fontSize * 0.35).toFixed(1)}" text-anchor="end" font-size="${fontSize}" font-weight="600" fill="currentColor" fill-opacity="${labelOpacity}">${Math.round(v)}</text>`;
+    });
+    if (opts.goalY != null) {
+      const gy = yAt(opts.goalY).toFixed(1);
+      svg += `<line x1="${pad.l}" y1="${gy}" x2="${W - pad.r}" y2="${gy}" stroke="${opts.goalColor || '#22c55e'}" stroke-width="${opts.goalStrokeWidth || 2.5}" stroke-linecap="round" />`;
+    }
+    const path = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${xAt(i).toFixed(1)},${yAt(p.y).toFixed(1)}`).join(' ');
+    svg += `<path d="${path}" fill="none" stroke="${opts.color}" stroke-width="${opts.strokeWidth || 2.5}" stroke-linejoin="round" stroke-linecap="round" />`;
+    const r = n > 30 ? 2.5 : (n > 14 ? 3.5 : 4.5);
+    points.forEach((p, i) => {
+      svg += `<circle cx="${xAt(i).toFixed(1)}" cy="${yAt(p.y).toFixed(1)}" r="${r}" fill="${opts.color}" />`;
+    });
+    // X labels: newest always labeled, then every k-th going back, spaced so labels never touch.
+    const minGap = xLabelW + xFontSize * 0.8;
+    const per = n > 1 ? iw / (n - 1) : iw;
+    const every = Math.max(1, Math.ceil(minGap / per));
+    for (let i = n - 1; i >= 0; i -= every) {
+      svg += `<text x="${xAt(i).toFixed(1)}" y="${H - Math.ceil(xFontSize * 0.45)}" text-anchor="middle" font-size="${xFontSize}" font-weight="600" fill="currentColor" fill-opacity="${labelOpacity}">${points[i].xLabel}</text>`;
+    }
+    svg += '</svg>';
+    container.innerHTML = svg;
+  }
+
   function drawLineChart(container, points, opts) {
     // points: [{xLabel, y}], opts: {color, goalY?, goalColor?, goalStrokeWidth?, height?, minWidth?, pointGap?,
     //   fontSize?, xFontSize?, yTicks?, strokeWidth?, pointRadius?, gridOpacity?, labelOpacity?, yDecimals?,
@@ -692,22 +768,19 @@
   function renderCalsHistory() {
     const dates = sortedDates(state.calories).filter(d => mealTotal(state.calories[d]) != null);
     const points = dates.map(d => ({ xLabel: formatShort(d), y: mealTotal(state.calories[d]) }));
-    drawLineChart(document.getElementById('cals-chart'), points, {
+    drawPixelChart(document.getElementById('cals-chart'), points, {
       color: '#f59e0b',
       goalY: state.goalCals,
       goalColor: '#22c55e',
-      goalStrokeWidth: 2.5,
+      goalStrokeWidth: 3,
       label: 'Calorie trend',
-      height: 1100,
-      minWidth: 900,
-      pointGap: 140,
-      fontSize: 84,
-      yTicks: 5,
-      strokeWidth: 5,
-      pointRadius: 8,
+      height: 340,
+      fontSize: 20,   // was 84 viewBox units ≈ 8.6px on a phone with ~47 days
+      xFontSize: 18,
+      maxYTicks: 4,
+      strokeWidth: 3,
       gridOpacity: 0.2,
-      labelOpacity: 0.72,
-      yDecimals: 0
+      labelOpacity: 0.85
     });
 
     const allDates = sortedDates(state.calories);
@@ -757,6 +830,15 @@
     renderCalsHistory();
     renderSettings();
   }
+
+  let calsResizeTimer = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(calsResizeTimer);
+    calsResizeTimer = setTimeout(() => {
+      const panel = document.getElementById('panel-cals');
+      if (panel && panel.classList.contains('active')) renderCalsHistory();
+    }, 150);
+  });
 
   // ---- navigation ----
   function showPanel(name) {

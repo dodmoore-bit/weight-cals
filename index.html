@@ -25,6 +25,17 @@
   <main>
     <!-- TODAY -->
     <section id="panel-today" class="panel active" role="tabpanel">
+      <div class="date-bar" id="date-bar">
+        <button type="button" class="date-nav" id="btn-prev-day" aria-label="Previous day">&#8249;</button>
+        <div class="date-pick">
+          <span class="date-pick-label" id="date-label">—</span>
+          <span class="date-pick-sub" id="date-sub">Today</span>
+          <input type="date" id="input-date" class="date-input" aria-label="Choose date" />
+        </div>
+        <button type="button" class="date-nav" id="btn-next-day" aria-label="Next day">&#8250;</button>
+        <button type="button" class="btn btn-ghost btn-sm date-today" id="btn-today" hidden>Today</button>
+      </div>
+
       <div class="stats">
         <div class="stat">
           <div class="label">Weight</div>
@@ -49,8 +60,8 @@
       </div>
 
       <div class="card">
-        <h2>Today’s weight</h2>
-        <p class="hint">Amt Lost = start weight − today’s weight</p>
+        <h2 id="weight-card-title">Today’s weight</h2>
+        <p class="hint" id="weight-card-hint">Amt Lost = start weight − today’s weight. Clear the box and save to remove it.</p>
         <div class="field">
           <label for="input-weight">Weight (lbs)</label>
           <input id="input-weight" type="number" inputmode="decimal" step="0.1" min="50" max="600" placeholder="e.g. 180.0" />
@@ -59,7 +70,7 @@
       </div>
 
       <div class="card">
-        <h2>Today’s meals</h2>
+        <h2 id="meals-card-title">Today’s meals</h2>
         <p class="hint">Enter a meal total, or use Σ Parts to add pieces (e.g. 280 + 120). Empty = not logged.</p>
 
         <div class="meal-block" data-meal="breakfast">
@@ -117,7 +128,8 @@
             <span class="history-summary-title">Weight history</span>
             <span class="history-summary-meta" id="weight-history-count"></span>
           </summary>
-          <ul class="list" id="weight-list"></ul>
+          <p class="hint list-tap-hint">Tap a day to view or edit it.</p>
+          <ul class="list list-tap" id="weight-list"></ul>
         </details>
       </div>
     </section>
@@ -138,7 +150,8 @@
             <span class="history-summary-title">Calorie history</span>
             <span class="history-summary-meta" id="cals-history-count"></span>
           </summary>
-          <ul class="list" id="cals-list"></ul>
+          <p class="hint list-tap-hint">Tap a day to view or edit it.</p>
+          <ul class="list list-tap" id="cals-list"></ul>
         </details>
       </div>
     </section>

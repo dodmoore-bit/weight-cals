@@ -69,6 +69,21 @@
 
   let state = load();
 
+  // ---- selected day (Today tab can view/edit any past day) ----
+  let selectedDay = todayISO();
+  let followToday = true; // keep tracking "today" across midnight if the user hasn't picked a day
+  let formDirty = false;  // unsaved edits in the Today tab inputs
+
+  function getSelectedDay() {
+    const today = todayISO();
+    if (followToday) selectedDay = today;
+    if (!isISODate(selectedDay) || selectedDay > today) {
+      selectedDay = today;
+      followToday = true;
+    }
+    return selectedDay;
+  }
+
   function cleanMeal(v) {
     if (v == null || v === '') return null;
     const n = Math.round(Number(v));
@@ -175,6 +190,26 @@
     return dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
   }
 
+  function isISODate(v) {
+    return typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
+  }
+
+  function addDays(iso, n) {
+    const [y, m, d] = iso.split('-').map(Number);
+    const dt = new Date(Date.UTC(y, m - 1, d + n));
+    return dt.toISOString().slice(0, 10);
+  }
+
+  // "Thu Oct 8" (adds the year if it isn't this year)
+  function formatDayLabel(iso) {
+    const [y, m, d] = iso.split('-').map(Number);
+    const dt = new Date(y, m - 1, d);
+    const sameYear = String(y) === todayISO().slice(0, 4);
+    const wd = dt.toLocaleDateString('en-US', { weekday: 'short' });
+    const md = dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return `${wd} ${md}` + (sameYear ? '' : `, ${y}`);
+  }
+
   function formatShort(iso) {
     const [y, m, d] = iso.split('-').map(Number);
     return `${m}/${d}`;
@@ -249,7 +284,7 @@
 
   function openPartsSheet(meal) {
     partsSheetMeal = meal;
-    const day = todayISO();
+    const day = getSelectedDay();
     const saved = getMealParts(day, meal);
     if (saved.length) {
       partsDraft = saved.slice();
@@ -343,13 +378,15 @@
 
   function applyPartsSheet() {
     if (!partsSheetMeal) return;
-    const day = todayISO();
+    const meal = partsSheetMeal;
+    const day = getSelectedDay();
     const nums = draftNumbers();
     const sum = nums.reduce((a, b) => a + b, 0);
     const input = document.getElementById(MEAL_INPUT_IDS[partsSheetMeal]);
     if (nums.length) {
       setMealParts(day, partsSheetMeal, nums);
       input.value = String(sum);
+      formDirty = true;
     } else {
       setMealParts(day, partsSheetMeal, []);
       // leave total as-is if user cleared parts without wanting to wipe total?
@@ -358,7 +395,7 @@
     save(state);
     updateMealPartsHints(day);
     closePartsSheet();
-    toast(nums.length ? `${MEAL_LABELS[partsSheetMeal]} = ${sum} kcal` : 'Parts cleared');
+    toast(nums.length ? `${MEAL_LABELS[meal]} = ${sum} kcal — tap Save calories` : 'Parts cleared');
   }
 
   function clearPartsDraft() {
@@ -382,9 +419,33 @@
   }
 
   // ---- UI: today panel ----
+  function renderDateBar(day, today) {
+    const isToday = day === today;
+    const isYesterday = day === addDays(today, -1);
+    document.getElementById('date-label').textContent = formatDayLabel(day);
+    document.getElementById('date-sub').textContent =
+      isToday ? 'Today' : (isYesterday ? 'Yesterday · editing past day' : 'Editing past day');
+    document.getElementById('date-bar').classList.toggle('past', !isToday);
+    const input = document.getElementById('input-date');
+    input.max = today;
+    input.value = day;
+    document.getElementById('btn-next-day').disabled = isToday;
+    document.getElementById('btn-today').hidden = isToday;
+    document.getElementById('header-date').textContent =
+      isToday ? formatDisplayDate(today) : `Viewing ${formatDisplayDate(day)}`;
+    document.getElementById('weight-card-title').textContent =
+      isToday ? 'Today’s weight' : `Weight · ${formatDayLabel(day)}`;
+    document.getElementById('meals-card-title').textContent =
+      isToday ? 'Today’s meals' : `Meals · ${formatDayLabel(day)}`;
+    document.getElementById('weight-card-hint').textContent =
+      `Amt Lost = start weight − ${isToday ? 'today’s' : 'that day’s'} weight. Clear the box and save to remove it.`;
+  }
+
   function renderToday() {
-    const day = todayISO();
-    document.getElementById('header-date').textContent = formatDisplayDate(day);
+    const today = todayISO();
+    const day = getSelectedDay();
+    const isToday = day === today;
+    renderDateBar(day, today);
 
     const w = state.weights[day];
     const hasStart = state.startWeight != null;
@@ -398,7 +459,7 @@
 
     const sw = document.getElementById('stat-weight');
     sw.textContent = w != null ? w.toFixed(1) : '—';
-    document.getElementById('stat-weight-meta').textContent = w != null ? 'lbs today' : 'not logged';
+    document.getElementById('stat-weight-meta').textContent = w != null ? (isToday ? 'lbs today' : `lbs · ${formatShort(day)}`) : 'not logged';
 
     const sl = document.getElementById('stat-lost');
     if (lost == null) {
@@ -435,6 +496,7 @@
       document.getElementById('input-bf').value = cal && cal.breakfast != null ? cal.breakfast : '';
       document.getElementById('input-lunch').value = cal && cal.lunch != null ? cal.lunch : '';
       document.getElementById('input-dinner').value = cal && cal.dinner != null ? cal.dinner : '';
+      formDirty = false;
     }
 
     updateMealPartsHints(day);
@@ -446,6 +508,30 @@
     document.getElementById('cal-progress-label').textContent =
       `${total != null ? total : 0} / ${goal} kcal` +
       (state.tdee ? ` · Est TDEE ${state.tdee}` : '');
+  }
+
+  function selectDay(iso, { force = false } = {}) {
+    const today = todayISO();
+    if (!isISODate(iso)) return false;
+    if (iso > today) {
+      iso = today;
+      toast('Can’t log future days');
+    }
+    if (iso === getSelectedDay()) {
+      renderToday();
+      return true;
+    }
+    if (!force && formDirty && iso !== selectedDay) {
+      if (!confirm(`Discard unsaved changes for ${formatDayLabel(selectedDay)}?`)) {
+        renderDateBar(selectedDay, today); // restore picker, keep the typed values
+        return false;
+      }
+    }
+    selectedDay = iso;
+    followToday = iso === today;
+    formDirty = false;
+    renderToday();
+    return true;
   }
 
   // ---- charts (simple SVG) ----
@@ -596,7 +682,7 @@
         const lost = Math.round((state.startWeight - w) * 10) / 10;
         lostStr = (lost >= 0 ? '+' : '') + lost.toFixed(1) + ' lbs lost';
       }
-      return `<li>
+      return `<li data-date="${d}" role="button" tabindex="0" aria-label="Open ${formatDisplayDate(d)}">
         <div class="left"><span class="date">${formatDisplayDate(d)}</span><span class="detail">${lostStr}</span></div>
         <div class="right">${w.toFixed(1)} <span style="color:var(--muted);font-weight:500;font-size:0.8rem">lbs</span></div>
       </li>`;
@@ -652,7 +738,7 @@
         right = String(t);
         rightClass = diff > 0 ? 'bad' : 'good';
       }
-      return `<li>
+      return `<li data-date="${d}" role="button" tabindex="0" aria-label="Open ${formatDisplayDate(d)}">
         <div class="left"><span class="date">${formatDisplayDate(d)}</span><span class="detail">${detail}</span></div>
         <div class="right ${rightClass}">${right} <span style="color:var(--muted);font-weight:500;font-size:0.8rem">kcal</span></div>
       </li>`;
@@ -685,6 +771,7 @@
     if (name === 'cals') renderCalsHistory();
     if (name === 'data') renderSettings();
     if (name === 'today') renderToday();
+    else document.getElementById('header-date').textContent = formatDisplayDate(todayISO());
   }
 
   // ---- export / import ----
@@ -848,20 +935,29 @@
   });
 
   document.getElementById('btn-save-weight').addEventListener('click', () => {
-    const day = todayISO();
+    const day = getSelectedDay();
+    const label = day === todayISO() ? '' : ` for ${formatDayLabel(day)}`;
     const w = parseOptionalFloat(document.getElementById('input-weight'));
     if (w == null) {
-      toast('Enter a weight');
+      if (state.weights[day] != null) {
+        delete state.weights[day];
+        save(state);
+        renderAll();
+        toast('Weight cleared' + label);
+      } else {
+        toast('Enter a weight');
+      }
       return;
     }
     state.weights[day] = w;
     save(state);
     renderAll();
-    toast('Weight saved');
+    toast('Weight saved' + label);
   });
 
   document.getElementById('btn-save-cals').addEventListener('click', () => {
-    const day = todayISO();
+    const day = getSelectedDay();
+    const label = day === todayISO() ? '' : ` for ${formatDayLabel(day)}`;
     const breakfast = parseOptionalInt(document.getElementById('input-bf'));
     const lunch = parseOptionalInt(document.getElementById('input-lunch'));
     const dinner = parseOptionalInt(document.getElementById('input-dinner'));
@@ -879,7 +975,7 @@
     }
     save(state);
     renderAll();
-    toast('Calories saved');
+    toast((breakfast == null && lunch == null && dinner == null ? 'Calories cleared' : 'Calories saved') + label);
   });
 
   document.getElementById('btn-save-cfg').addEventListener('click', () => {
@@ -938,6 +1034,47 @@
   });
 
 
+  // Date selector
+  document.getElementById('btn-prev-day').addEventListener('click', () => selectDay(addDays(getSelectedDay(), -1)));
+  document.getElementById('btn-next-day').addEventListener('click', () => selectDay(addDays(getSelectedDay(), 1)));
+  document.getElementById('btn-today').addEventListener('click', () => selectDay(todayISO()));
+  const dateInput = document.getElementById('input-date');
+  dateInput.addEventListener('change', () => {
+    if (isISODate(dateInput.value)) selectDay(dateInput.value);
+    else renderToday();
+  });
+  // Some desktop browsers need showPicker() for the overlaid input to open on click.
+  dateInput.addEventListener('click', () => {
+    try { if (typeof dateInput.showPicker === 'function') dateInput.showPicker(); } catch { /* ignore */ }
+  });
+  ['input-weight', 'input-bf', 'input-lunch', 'input-dinner'].forEach(id => {
+    document.getElementById(id).addEventListener('input', () => { formDirty = true; });
+  });
+
+  // Tap a history row -> open that day on the Today tab
+  ['weight-list', 'cals-list'].forEach(id => {
+    const list = document.getElementById(id);
+    const open = (li) => {
+      if (!li || !li.dataset.date) return;
+      if (selectDay(li.dataset.date)) {
+        showPanel('today');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    };
+    list.addEventListener('click', (e) => open(e.target.closest('li[data-date]')));
+    list.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        const li = e.target.closest('li[data-date]');
+        if (li) { e.preventDefault(); open(li); }
+      }
+    });
+  });
+
+  // Roll over to the new day if the app is left open past midnight.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && !formDirty && !partsSheetMeal) renderToday();
+  });
+
   // Parts sheet controls
   document.querySelectorAll('[data-open-parts]').forEach(btn => {
     btn.addEventListener('click', () => openPartsSheet(btn.dataset.openParts));
@@ -960,8 +1097,21 @@
 
   // ---- service worker ----
   if ('serviceWorker' in navigator) {
+    const hadController = !!navigator.serviceWorker.controller;
+    let reloading = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      // A new version just activated; reload once so the new code is used
+      // (skip if there's unsaved input).
+      if (!hadController || reloading || formDirty || partsSheetMeal) return;
+      reloading = true;
+      window.location.reload();
+    });
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js').catch(() => {});
+      navigator.serviceWorker.register('./sw.js').then((reg) => {
+        document.addEventListener('visibilitychange', () => {
+          if (document.visibilityState === 'visible') reg.update().catch(() => {});
+        });
+      }).catch(() => {});
     });
   }
 

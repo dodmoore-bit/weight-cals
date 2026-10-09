@@ -691,3 +691,119 @@ main {
 }
 .card .hint.import-status { margin: 10px 0 0; color: var(--accent); font-weight: 600; }
 .card .hint.import-status.error { color: var(--danger); }
+
+/* ---- date selector (Today tab) ---- */
+.date-bar {
+  display: grid;
+  grid-template-columns: var(--touch) 1fr var(--touch) auto;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px;
+  margin-bottom: 14px;
+}
+.date-bar.past {
+  border-color: color-mix(in srgb, var(--warn) 65%, var(--border));
+  background: color-mix(in srgb, var(--warn) 7%, var(--bg-card));
+}
+.date-bar .date-today[hidden] { display: none; }
+.date-bar:has(.date-today[hidden]) { grid-template-columns: var(--touch) 1fr var(--touch); }
+.date-nav {
+  width: var(--touch);
+  height: var(--touch);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 1.7rem;
+  line-height: 1;
+  font-weight: 600;
+  cursor: pointer;
+  touch-action: manipulation;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0 3px;
+}
+.date-nav:active { background: var(--bg-elev); }
+.date-nav:disabled { opacity: 0.3; cursor: default; }
+.date-pick {
+  position: relative;
+  min-height: var(--touch);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  cursor: pointer;
+  text-align: center;
+}
+.date-pick:active { background: var(--bg-elev); }
+.date-pick-label {
+  font-size: 1.1rem;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  pointer-events: none;
+}
+.date-pick-label::after {
+  content: " ▾";
+  font-size: 0.75em;
+  color: var(--muted);
+}
+.date-pick-sub {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--muted);
+  pointer-events: none;
+}
+.date-bar.past .date-pick-sub { color: var(--warn); }
+/* Native date input stretched invisibly over the label so a tap opens the OS picker. */
+.date-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  font-size: 16px; /* prevents iOS zoom */
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  color: transparent;
+}
+.date-input::-webkit-calendar-picker-indicator {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+.date-today { min-height: var(--touch); }
+
+/* tappable history rows */
+.list-tap li[data-date] {
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  border-radius: 10px;
+  padding-left: 6px;
+  padding-right: 6px;
+}
+.list-tap li[data-date]:active,
+.list-tap li[data-date]:focus-visible {
+  background: var(--bg-elev);
+  outline: none;
+}
+.list-tap li[data-date] .right::after {
+  content: "›";
+  margin-left: 8px;
+  color: var(--muted);
+  font-weight: 600;
+}
+.card .hint.list-tap-hint { margin: 2px 0 4px; }
